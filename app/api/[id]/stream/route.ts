@@ -1,20 +1,21 @@
 import { chatMessageHook } from "@/workflows/hooks/chat-message";
+import { log } from "@/lib/config";
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ id: string }> }) {
-
+  { params }: { params: Promise<{ id: string }> }
+) {
   const { id: conversationId } = await params;
   const { message } = await request.json();
 
-  console.log("🔵 [API] Resuming conversation:", conversationId);
+  log.api("Resuming conversation:", conversationId);
 
   await chatMessageHook.resume(conversationId, {
-    message: message,
-    conversationId: conversationId
+    message,
+    conversationId,
   });
 
-  console.log("🔵 [API] Hook resumed successfully");
+  log.api("Hook resumed successfully");
 
   return new Response("OK");
 }

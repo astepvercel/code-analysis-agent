@@ -1,0 +1,139 @@
+'use client';
+
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import type { MessagePart } from "../client/types";
+
+export function MessagePartRenderer({ part }: { part: MessagePart }) {
+  if (part.type === 'text' && part.text) {
+    return (
+      <div className="markdown-content">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
+      </div>
+    );
+  }
+
+  if (part.type?.startsWith('tool-')) {
+    const toolName = part.type.replace('tool-', '');
+    const isExecuting = part.state === 'executing';
+    const isComplete = part.state === 'output-available' || part.state === 'done';
+    const isError = part.state === 'output-error';
+    const command = (part.input as { command?: string })?.command;
+
+    return (
+      <div className={`tool-call ${isError ? 'error' : isComplete ? 'complete' : 'executing'}`}>
+        <div className="tool-header">
+          <span className="tool-status-dot" />
+          <span className="tool-status-text">
+            {isExecuting && 'Executing'}
+            {isComplete && 'Completed'}
+            {isError && 'Failed'}
+          </span>
+          <span className="tool-name">{toolName}</span>
+        </div>
+        {command && (
+          <code className="tool-command-preview">{command.length > 80 ? `${command.slice(0, 80)}...` : command}</code>
+        )}
+
+        {part.input ? (
+          <details className="tool-details">
+            <summary>Input</summary>
+            <pre>{JSON.stringify(part.input, null, 2)}</pre>
+          </details>
+        ) : null}
+
+        {isComplete && part.output ? (
+          <ToolOutputRenderer output={part.output} />
+        ) : null}
+
+        {isError && part.errorText ? (
+          <div className="tool-error">Error: {part.errorText}</div>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (part.type === 'data-workflow' && part.data) {
+    return <div className="workflow-data">{JSON.stringify(part.data)}</div>;
+  }
+
+  return null;
+}
+
+function ToolOutputRenderer({ output }: { output: unknown }) {
+  if (typeof output === 'object' && output !== null) {
+    const obj = output as Record<string, unknown>;
+
+    if ('stdout' in obj || 'stderr' in obj || 'output' in obj) {
+      const stdout = obj.stdout || obj.output || '';
+      const stderr = obj.stderr || '';
+      const exitCode = typeof obj.exitCode === 'number' ? obj.exitCode : 0;
+      const hasStdout = stdout && String(stdout).trim();
+      const hasStderr = stderr && String(stderr).trim();
+      const isError = exitCode !== 0;
+
+      return (
+        <div className="tool-output">
+          {hasStdout ? (
+            <>
+              <div className="tool-output-label">Output</div>
+              <pre className="stdout">{String(stdout)}</pre>
+            </>
+          ) : null}
+
+          {hasStderr ? (
+            <>
+              <div className={`tool-output-label ${isError ? 'stderr-label' : ''}`}>
+                {isError ? 'Error' : 'Info'}
+              </div>
+              <pre className={isError ? 'stderr' : 'stdout-info'}>{String(stderr)}</pre>
+            </>
+          ) : null}
+
+          {!hasStdout && !hasStderr ? (
+            <>
+              <div className="tool-output-label">Output</div>
+              <div className="stdout">(no output)</div>
+            </>
+          ) : null}
+
+          <details className="raw-json">
+            <summary>View raw JSON</summary>
+            <pre>{JSON.stringify(output, null, 2)}</pre>
+          </details>
+        </div>
+      );
+    }
+  }
+
+  // Fallback: try to render as markdown
+  const content = formatOutput(output);
+  return (
+    <div className="tool-output">
+      <div className="tool-output-label">Output</div>
+      <div className="stdout markdown-content">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      </div>
+    </div>
+  );
+}
+
+function formatOutput(output: unknown): string {
+  if (output === null || output === undefined) {
+    return String(output);
+  }
+
+  if (typeof output === 'object') {
+    return JSON.stringify(output, null, 2);
+  }
+
+  if (typeof output === 'string') {
+    try {
+      return JSON.stringify(JSON.parse(output), null, 2);
+    } catch {
+      return output;
+    }
+  }
+
+  return String(output);
+}

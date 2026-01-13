@@ -148,9 +148,7 @@ export async function createConversationSandbox() {
 
 **Demonstrated features:**
 - Model routing through Vercel AI Gateway
-- Support for multiple providers (AWS Bedrock used here)
-- Simple configuration: `model: "bedrock/claude-4-sonnet-20250514-v1"`
-- Authentication via `AI_GATEWAY_API_KEY` environment variable
+- Support for multiple providers 
 
 ### 4. @workflow/ai (DurableAgent)
 

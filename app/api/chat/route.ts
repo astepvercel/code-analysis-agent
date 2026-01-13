@@ -1,23 +1,29 @@
 import { start } from "workflow/api";
-import { chatWorkflow } from "@/workflows";
+import { customBashWorkflow } from "@/workflows/custom-bash";
 import { createUIMessageStreamResponse, type UIMessage } from "ai";
+import { log } from "@/lib/config";
+
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
-	console.log("🔵 [API] POST /api/chat - Starting conversation");
+  log.api("POST /api/chat - Starting workflow");
 
-	const { conversationId, messages }: { conversationId: string, messages: UIMessage[] } = await req.json();
+  const {
+    conversationId,
+    messages,
+  }: { conversationId: string; messages: UIMessage[] } = await req.json();
 
-	console.log("🔵 [API] Conversation ID:", conversationId);
-	console.log("🔵 [API] Starting workflow with", messages.length, "message(s)");
+  log.api("Conversation ID:", conversationId);
+  log.api("Starting workflow with", messages.length, "message(s)");
 
-	const run = await start(chatWorkflow, [conversationId, messages]);
+  const run = await start(customBashWorkflow, [conversationId, messages]);
 
-	console.log("🔵 [API] Workflow started - Run ID:", run.runId);
+  log.api("Workflow started - Run ID:", run.runId);
 
-	return createUIMessageStreamResponse({
-		stream: run.readable,
-		headers: {
-			"x-workflow-run-id": run.runId,
-		},
-	});
+  return createUIMessageStreamResponse({
+    stream: run.readable,
+    headers: {
+      "x-workflow-run-id": run.runId,
+    },
+  });
 }
