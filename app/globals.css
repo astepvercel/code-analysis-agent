@@ -33,7 +33,7 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 20px;
+  font-size: 14px;
   background: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -71,13 +71,13 @@ header {
 }
 
 .header-left h1 {
-  font-size: 28px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .subtitle {
-  font-size: 18px;
+  font-size: 13px;
   color: var(--text-muted);
   margin-top: 6px;
 }
@@ -100,14 +100,14 @@ header {
 }
 
 .toggle-label {
-  font-size: 18px;
+  font-size: 14px;
   color: var(--text-muted);
   padding: 0 14px;
 }
 
 .mode-toggle button {
   padding: 12px 20px;
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 500;
   border: none;
   border-radius: 6px;
@@ -129,7 +129,7 @@ header {
 /* New Conversation Button */
 .new-conversation {
   padding: 14px 26px;
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 500;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -208,14 +208,14 @@ main {
 }
 
 .empty-title {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 500;
   color: var(--text-secondary);
   margin-bottom: 10px;
 }
 
 .empty-subtitle {
-  font-size: 20px;
+  font-size: 13px;
 }
 
 /* Message Bubbles */
@@ -236,7 +236,7 @@ main {
 }
 
 .message-role {
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -300,7 +300,7 @@ main {
 .chat-input {
   flex: 1;
   padding: 20px 24px;
-  font-size: 20px;
+  font-size: 13px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-secondary);
@@ -320,7 +320,7 @@ main {
 /* Status Badge */
 .status-badge {
   padding: 16px 24px;
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: var(--radius);
   text-transform: uppercase;
@@ -371,7 +371,7 @@ main {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 16px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -430,7 +430,7 @@ main {
 
 .tool-details summary {
   cursor: pointer;
-  font-size: 18px;
+  font-size: 14px;
   color: var(--text-muted);
   margin-bottom: 12px;
 }
@@ -439,7 +439,7 @@ main {
   background: var(--bg-primary);
   padding: 18px;
   border-radius: 8px;
-  font-size: 17px;
+  font-size: 13px;
   line-height: 1.7;
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -453,7 +453,7 @@ main {
 }
 
 .tool-output-label {
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 12px;
@@ -469,7 +469,7 @@ main {
   background: var(--bg-tertiary);
   padding: 24px;
   border-radius: 8px;
-  font-size: 18px;
+  font-size: 14px;
   line-height: 1.8;
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -485,7 +485,7 @@ main {
   background: rgba(239, 68, 68, 0.1);
   padding: 24px;
   border-radius: 8px;
-  font-size: 18px;
+  font-size: 14px;
   line-height: 1.8;
   overflow-x: auto;
   border: 1px solid rgba(239, 68, 68, 0.3);
@@ -501,7 +501,7 @@ main {
   background: var(--bg-tertiary);
   padding: 24px;
   border-radius: 8px;
-  font-size: 18px;
+  font-size: 14px;
   line-height: 1.8;
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -520,7 +520,7 @@ main {
 
 .raw-json summary {
   cursor: pointer;
-  font-size: 15px;
+  font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 10px;
 }
@@ -546,7 +546,7 @@ main {
   border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: 8px;
   color: #fca5a5;
-  font-size: 19px;
+  font-size: 13px;
 }
 
 /* Workflow Data */
@@ -556,7 +556,7 @@ main {
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 18px;
+  font-size: 14px;
   font-family: monospace;
 }
 
@@ -565,7 +565,7 @@ main {
    ========================================================================== */
 
 .markdown-content {
-  font-size: 20px;
+  font-size: 13px;
   line-height: 1.85;
 }
 
@@ -616,7 +616,7 @@ main {
 .markdown-content pre code {
   background: none;
   padding: 0;
-  font-size: 17px;
+  font-size: 13px;
   line-height: 1.7;
 }
 
@@ -651,7 +651,7 @@ main {
   border-collapse: collapse;
   width: 100%;
   margin: 12px 0;
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .markdown-content th,
