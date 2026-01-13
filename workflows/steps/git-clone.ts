@@ -1,33 +1,32 @@
-export async function gitCloneStep({
-  repo_url,
+import { Sandbox } from "@vercel/sandbox";
+import { log, STEP_NAMES } from "@/lib/config";
+
+export async function cloneRepository({
+  repoUrl,
   destination,
-  sandboxIdentifier,
+  sandboxId,
 }: {
-  repo_url: string;
-  destination: string;
-  sandboxIdentifier?: string;
+  repoUrl: string;
+  destination?: string;
+  sandboxId: string;
 }) {
-  'use step';
+  "use step";
 
-  const sandboxId = sandboxIdentifier || "default-session";
+  log.step(STEP_NAMES.gitClone, "Cloning repository:", repoUrl);
 
-  console.log("🔧 [git_clone] Cloning repository:", repo_url);
-
-  const { Sandbox } = await import("@vercel/sandbox");
   const sandbox = await Sandbox.get({ sandboxId });
-  const repoName = destination || repo_url.split('/').pop()?.replace('.git', '') || 'repo';
+  const repoName =
+    destination || repoUrl.split("/").pop()?.replace(".git", "") || "repo";
 
-  let checkCmd, checkOutput;
-  try {
-    checkCmd = await sandbox.runCommand('/bin/sh', ['-c', `test -d "${repoName}" && echo "exists" || echo "not_exists"`]);
-    checkOutput = await checkCmd.stdout();
-  } catch (error) {
-    console.error("🔧 [git_clone] Error checking if repo exists:", (error as any).message);
-    throw error;
-  }
+  // Check if repo already exists
+  const checkResult = await sandbox.runCommand("/bin/sh", [
+    "-c",
+    `test -d "${repoName}" && echo "exists" || echo "not_exists"`,
+  ]);
+  const checkOutput = await checkResult.stdout();
 
   if (checkOutput.trim() === "exists") {
-    console.log("🔧 [git_clone] Repository already exists, skipping clone");
+    log.step(STEP_NAMES.gitClone, "Repository already exists, skipping clone");
     return {
       success: true,
       output: `Repository '${repoName}' already exists. Skipped.`,
@@ -36,11 +35,14 @@ export async function gitCloneStep({
     };
   }
 
-  console.log("🔧 [git_clone] Cloning repository...");
-  const result = await sandbox.runCommand('/bin/sh', ['-c', `git clone ${repo_url} ${repoName}`]);
+  log.step(STEP_NAMES.gitClone, "Cloning repository...");
+  const result = await sandbox.runCommand("/bin/sh", [
+    "-c",
+    `git clone ${repoUrl} ${repoName}`,
+  ]);
   const output = await result.output("both");
 
-  console.log("🔧 [git_clone] Clone completed with exit code:", result.exitCode);
+  log.step(STEP_NAMES.gitClone, "Clone completed with exit code:", result.exitCode);
 
   return {
     success: result.exitCode === 0,
