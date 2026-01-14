@@ -26,10 +26,9 @@ export function WorkflowChat() {
   // Follow-up messages we add locally (user messages + assistant responses after first turn)
   const [followUpMessages, setFollowUpMessages] = useState<Message[]>([]);
 
-  // Track split points - array of content lengths where each turn ends
-  // splitPoints[0] = where first assistant response ends
-  // splitPoints[1] = where second assistant response ends, etc.
-  const splitPoints = useRef<number[]>([]);
+  // Track split points - array of content lengths and part indices where each turn ends
+  // splitPoints[0] = { content: X, parts: Y } where first assistant response ends
+  const splitPoints = useRef<{ content: number; parts: number }[]>([]);
 
   // Transport for initial message
   const transport = useMemo(
@@ -67,6 +66,9 @@ export function WorkflowChat() {
   const totalAssistantContent = streamAssistant?.content ||
     streamAssistant?.parts?.filter((p: any) => p.type === "text").map((p: any) => p.text).join("") || "";
 
+  // Get all parts from the stream assistant
+  const allParts = streamAssistant?.parts || [];
+
   // Build display messages: first turn from stream + follow-ups
   const displayMessages = useMemo(() => {
     const result: Message[] = [];
@@ -79,20 +81,21 @@ export function WorkflowChat() {
 
     // Add first assistant response
     if (streamAssistant) {
-      // First assistant content: from 0 to first split point (or all if no follow-ups)
-      const firstSplitPoint = splitPoints.current[0];
-      const firstAssistantContent = firstSplitPoint !== undefined
-        ? totalAssistantContent.slice(0, firstSplitPoint)
+      // First assistant: from 0 to first split point (or all if no follow-ups)
+      const firstSplit = splitPoints.current[0];
+      const firstAssistantContent = firstSplit !== undefined
+        ? totalAssistantContent.slice(0, firstSplit.content)
         : totalAssistantContent;
+      const firstAssistantParts = firstSplit !== undefined
+        ? allParts.slice(0, firstSplit.parts)
+        : allParts;
 
-      if (firstAssistantContent || splitPoints.current.length > 0) {
+      if (firstAssistantContent || firstAssistantParts.length > 0 || splitPoints.current.length > 0) {
         result.push({
           id: "assistant-turn-1",
           role: "assistant",
           content: firstAssistantContent,
-          parts: firstSplitPoint !== undefined
-            ? [{ type: "text", text: firstAssistantContent }]
-            : streamAssistant.parts,
+          parts: firstAssistantParts,
         } as Message);
       }
     }
@@ -103,24 +106,33 @@ export function WorkflowChat() {
       if (msg.role === "user") {
         result.push(msg);
       } else if (msg.role === "assistant") {
-        // Get this assistant turn's content from the stream
-        const startPoint = splitPoints.current[assistantIndex] || 0;
-        const endPoint = splitPoints.current[assistantIndex + 1];
-        const turnContent = endPoint !== undefined
-          ? totalAssistantContent.slice(startPoint, endPoint)
-          : totalAssistantContent.slice(startPoint);
+        // Get this assistant turn's content and parts from the stream
+        const startSplit = splitPoints.current[assistantIndex];
+        const endSplit = splitPoints.current[assistantIndex + 1];
+
+        const contentStart = startSplit?.content || 0;
+        const contentEnd = endSplit?.content;
+        const turnContent = contentEnd !== undefined
+          ? totalAssistantContent.slice(contentStart, contentEnd)
+          : totalAssistantContent.slice(contentStart);
+
+        const partsStart = startSplit?.parts || 0;
+        const partsEnd = endSplit?.parts;
+        const turnParts = partsEnd !== undefined
+          ? allParts.slice(partsStart, partsEnd)
+          : allParts.slice(partsStart);
 
         result.push({
           ...msg,
           content: turnContent,
-          parts: [{ type: "text", text: turnContent }],
+          parts: turnParts,
         } as Message);
         assistantIndex++;
       }
     }
 
     return result;
-  }, [streamMessages, streamAssistant, totalAssistantContent, followUpMessages]);
+  }, [streamMessages, streamAssistant, totalAssistantContent, followUpMessages, allParts]);
 
   // Check if last follow-up assistant message needs content update
   useEffect(() => {
@@ -130,7 +142,8 @@ export function WorkflowChat() {
     if (lastFollowUp.role === "assistant") {
       // Get the start point for this assistant turn
       const assistantCount = followUpMessages.filter(m => m.role === "assistant").length;
-      const startPoint = splitPoints.current[assistantCount - 1] || 0;
+      const startSplit = splitPoints.current[assistantCount - 1];
+      const startPoint = startSplit?.content || 0;
       const newContent = totalAssistantContent.slice(startPoint);
 
       if (newContent && newContent !== lastFollowUp.content) {
@@ -161,8 +174,11 @@ export function WorkflowChat() {
         await sendInitialMessage({ text, metadata: { createdAt: Date.now() } });
       } else {
         // Follow-up message
-        // Record the current content length as a split point
-        splitPoints.current.push(totalAssistantContent.length);
+        // Record the current content length and parts count as a split point
+        splitPoints.current.push({
+          content: totalAssistantContent.length,
+          parts: allParts.length,
+        });
 
         // Add user message
         const userMessage: Message = {
@@ -195,7 +211,7 @@ export function WorkflowChat() {
         }
       }
     },
-    [workflowRunId, sendInitialMessage, totalAssistantContent]
+    [workflowRunId, sendInitialMessage, totalAssistantContent, allParts]
   );
 
   return (
