@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { WorkflowChatTransport } from "@workflow/ai";
 import { ChatUI } from "./ChatUI";
@@ -61,13 +61,24 @@ export function WorkflowChat() {
     transport: transport as any,
   });
 
-  // Get the full assistant content from stream (it's all concatenated)
-  const streamAssistant = streamMessages.find(m => m.role === "assistant");
-  const totalAssistantContent = streamAssistant?.content ||
-    streamAssistant?.parts?.filter((p: any) => p.type === "text").map((p: any) => p.text).join("") || "";
+  // Get the assistant message from stream (memoized to prevent reference changes)
+  const streamAssistant = useMemo(
+    () => streamMessages.find(m => m.role === "assistant"),
+    [streamMessages]
+  );
 
-  // Get all parts from the stream assistant
-  const allParts = streamAssistant?.parts || [];
+  // Get the full assistant content from stream (it's all concatenated)
+  const totalAssistantContent = useMemo(() => {
+    if (!streamAssistant) return "";
+    return streamAssistant.content ||
+      streamAssistant.parts?.filter((p: any) => p.type === "text").map((p: any) => p.text).join("") || "";
+  }, [streamAssistant]);
+
+  // Get all parts from the stream assistant (memoized to prevent reference changes)
+  const allParts = useMemo(
+    () => streamAssistant?.parts || [],
+    [streamAssistant]
+  );
 
   // Build display messages: first turn from stream + follow-ups
   const displayMessages = useMemo(() => {
@@ -134,25 +145,6 @@ export function WorkflowChat() {
     return result;
   }, [streamMessages, streamAssistant, totalAssistantContent, followUpMessages, allParts]);
 
-  // Check if last follow-up assistant message needs content update
-  useEffect(() => {
-    if (followUpMessages.length === 0) return;
-
-    const lastFollowUp = followUpMessages[followUpMessages.length - 1];
-    if (lastFollowUp.role === "assistant") {
-      // Get the start point for this assistant turn
-      const assistantCount = followUpMessages.filter(m => m.role === "assistant").length;
-      const startSplit = splitPoints.current[assistantCount - 1];
-      const startPoint = startSplit?.content || 0;
-      const newContent = totalAssistantContent.slice(startPoint);
-
-      if (newContent && newContent !== lastFollowUp.content) {
-        setFollowUpMessages(prev => prev.map((m, i) =>
-          i === prev.length - 1 ? { ...m, content: newContent } : m
-        ));
-      }
-    }
-  }, [totalAssistantContent, followUpMessages]);
 
   // Status logic - SIMPLE:
   // No messages = ready
