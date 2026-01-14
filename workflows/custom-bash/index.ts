@@ -1,3 +1,10 @@
+/**
+ * Custom Bash Workflow - Durable multi-turn chat with sandbox tools.
+ *
+ * Creates a persistent sandbox environment and runs an AI agent that can
+ * execute bash commands, read files, and analyze code repositories.
+ * User messages are emitted to the stream for turn boundary detection.
+ */
 import {
   convertToModelMessages,
   UIMessageChunk,
@@ -17,16 +24,6 @@ import { runBash } from "../steps/bash";
 import { WORKFLOW_SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { MODEL_ID, log, TOOL_NAMES } from "@/lib/config";
 
-/**
- * customBashWorkflow - Durable multi-turn chat with sandbox tools
- *
- * HOW IT WORKS:
- * 1. Creates a sandbox environment
- * 2. Streams agent responses to client
- * 3. Waits for follow-up messages via hook
- * 4. Emits user messages to stream (so client can detect turn boundaries)
- * 5. Loops until user sends "/done"
- */
 export async function customBashWorkflow(
   conversationId: string,
   initMessages: UIMessage[]

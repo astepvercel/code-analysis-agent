@@ -1,3 +1,9 @@
+/**
+ * BashToolChat - Chat component for Bash-Tool mode.
+ *
+ * Stateless mode using the bash-tool library. Each request creates
+ * or reuses a sandbox, runs the agent, and streams the response.
+ */
 "use client";
 
 import { useMemo } from "react";

@@ -1,8 +1,13 @@
+/**
+ * ChatUI - Shared chat interface component.
+ *
+ * Renders messages, input, and status indicators for both
+ * bash-tool and workflow modes. Handles auto-scroll and submission.
+ */
 "use client";
 
 import { useRef, useEffect, useCallback } from 'react';
-import type { Message } from "../client/types";
-import type { AgentMode } from "../client/types";
+import type { Message, AgentMode } from "../client/types";
 import { MessagePartRenderer } from './MessageRenderer';
 import { UI_CONFIG } from '@/lib/config';
 

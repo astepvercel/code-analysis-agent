@@ -1,3 +1,11 @@
+/**
+ * MessageRenderer - Renders message parts (text, tools, data).
+ *
+ * Handles different part types from the AI SDK stream:
+ * - Text parts: rendered as markdown
+ * - Tool parts: rendered with status (Running/Completed/Failed)
+ * - Data parts: rendered as JSON
+ */
 "use client";
 
 import ReactMarkdown from 'react-markdown';

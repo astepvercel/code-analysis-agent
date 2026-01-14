@@ -1,3 +1,10 @@
+/**
+ * WorkflowChat - Multi-turn chat component for Workflow mode.
+ *
+ * Uses Vercel Workflows for durable, checkpointed conversations.
+ * User messages are emitted to the stream as `data-user-message` chunks,
+ * allowing turn boundaries to be detected by scanning the parts array.
+ */
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
@@ -7,19 +14,6 @@ import { ChatUI } from "./ChatUI";
 import { getConversationId } from "../client/session";
 import { STORAGE_KEYS } from "@/lib/config";
 import type { Message } from "../client/types";
-
-/**
- * WorkflowChat - Multi-turn chat using Vercel Workflows
- *
- * HOW IT WORKS:
- * 1. All content streams into a single assistant message's `parts` array
- * 2. User follow-ups are emitted to stream as `data-user-message` chunks
- * 3. Client scans parts for these chunks to split into separate turns
- *
- * STREAM STRUCTURE:
- * [text][tool][tool] → [data-user-message] → [text][tool] → [data-user-message] → [text]
- *  └── Turn 1 ────┘    └─ "follow up" ──┘    └─ Turn 2 ─┘   └── "another" ────┘   └ T3 ┘
- */
 export function WorkflowChat() {
   // Track workflow run ID for follow-up messages
   const [workflowRunId, setWorkflowRunId] = useState<string | null>(() => {
