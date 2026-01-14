@@ -167,6 +167,7 @@ main {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: 24px 24px 0;
 }
 
 .chat-container {
@@ -178,6 +179,9 @@ main {
   margin: 0 auto;
   width: 100%;
   padding: 0 24px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
 /* ==========================================================================
