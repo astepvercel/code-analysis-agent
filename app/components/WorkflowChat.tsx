@@ -11,9 +11,11 @@ import type { Message } from "../client/types";
 /**
  * Multi-turn workflow chat.
  *
- * Simplified approach:
- * - First turn: Use streamMessages directly from useChat
- * - Follow-ups: Track locally added user messages and splice in new assistant content
+ * SIMPLIFIED APPROACH:
+ * - Track turn boundaries by part index only (no content-length tracking)
+ * - turnBoundaries[0] = part index where turn 1 starts
+ * - Turn 0: parts[0..turnBoundaries[0])
+ * - Turn N: parts[turnBoundaries[N-1]..turnBoundaries[N])
  */
 export function WorkflowChat() {
   const [workflowRunId, setWorkflowRunId] = useState<string | null>(() => {
@@ -23,14 +25,13 @@ export function WorkflowChat() {
     return null;
   });
 
-  // Follow-up messages we add locally (user messages + assistant responses after first turn)
-  const [followUpMessages, setFollowUpMessages] = useState<Message[]>([]);
+  // User's follow-up messages (we derive assistant content from parts)
+  const [followUpUserMessages, setFollowUpUserMessages] = useState<Message[]>([]);
 
-  // Track split points - array of content lengths and part indices where each turn ends
-  // splitPoints[0] = { content: X, parts: Y } where first assistant response ends
-  const splitPoints = useRef<{ content: number; parts: number }[]>([]);
+  // Part indices where each new turn starts
+  // turnBoundaries[0] = index where turn 1 starts, etc.
+  const turnBoundaries = useRef<number[]>([]);
 
-  // Transport for initial message
   const transport = useMemo(
     () =>
       new WorkflowChatTransport({
@@ -61,115 +62,83 @@ export function WorkflowChat() {
     transport: transport as any,
   });
 
-  // Get the assistant message from stream (memoized to prevent reference changes)
+  // Get assistant message and parts from stream
   const streamAssistant = useMemo(
-    () => streamMessages.find(m => m.role === "assistant"),
+    () => streamMessages.find((m) => m.role === "assistant"),
     [streamMessages]
   );
-
-  // Get the full assistant content from stream (it's all concatenated)
-  const totalAssistantContent = useMemo(() => {
-    if (!streamAssistant) return "";
-    return streamAssistant.parts?.filter((p: any) => p.type === "text").map((p: any) => p.text).join("") || "";
-  }, [streamAssistant]);
-
-  // Get all parts from the stream assistant (memoized to prevent reference changes)
   const allParts = useMemo(
     () => streamAssistant?.parts || [],
     [streamAssistant]
   );
 
-  // Build display messages: first turn from stream + follow-ups
+  // Helper: get parts for a specific turn
+  const getPartsForTurn = useCallback(
+    (turnIndex: number) => {
+      const start = turnIndex === 0 ? 0 : turnBoundaries.current[turnIndex - 1];
+      const end = turnBoundaries.current[turnIndex];
+      return end !== undefined ? allParts.slice(start, end) : allParts.slice(start);
+    },
+    [allParts]
+  );
+
+  // Build display messages
   const displayMessages = useMemo(() => {
     const result: Message[] = [];
 
-    // Add first user message from stream
-    const firstUser = streamMessages.find(m => m.role === "user");
+    // First user message
+    const firstUser = streamMessages.find((m) => m.role === "user");
     if (firstUser) {
       result.push(firstUser as Message);
     }
 
-    // Add first assistant response
-    if (streamAssistant) {
-      // First assistant: from 0 to first split point (or all if no follow-ups)
-      const firstSplit = splitPoints.current[0];
-      const firstAssistantContent = firstSplit !== undefined
-        ? totalAssistantContent.slice(0, firstSplit.content)
-        : totalAssistantContent;
-      const firstAssistantParts = firstSplit !== undefined
-        ? allParts.slice(0, firstSplit.parts)
-        : allParts;
-
-      if (firstAssistantContent || firstAssistantParts.length > 0 || splitPoints.current.length > 0) {
-        result.push({
-          id: "assistant-turn-1",
-          role: "assistant",
-          content: firstAssistantContent,
-          parts: firstAssistantParts,
-        } as Message);
-      }
+    // First assistant turn (turn 0)
+    const turn0Parts = getPartsForTurn(0);
+    if (turn0Parts.length > 0 || followUpUserMessages.length > 0) {
+      result.push({
+        id: "assistant-turn-0",
+        role: "assistant",
+        content: "", // Content derived from parts by renderer
+        parts: turn0Parts,
+      } as Message);
     }
 
-    // Add follow-up messages (user messages + their assistant responses)
-    let assistantIndex = 0; // Track which assistant placeholder we're on
-    for (const msg of followUpMessages) {
-      if (msg.role === "user") {
-        result.push(msg);
-      } else if (msg.role === "assistant") {
-        // Get this assistant turn's content and parts from the stream
-        const startSplit = splitPoints.current[assistantIndex];
-        const endSplit = splitPoints.current[assistantIndex + 1];
+    // Follow-up turns: interleave user messages with assistant responses
+    followUpUserMessages.forEach((userMsg, index) => {
+      // User message
+      result.push(userMsg);
 
-        const contentStart = startSplit?.content || 0;
-        const contentEnd = endSplit?.content;
-        const turnContent = contentEnd !== undefined
-          ? totalAssistantContent.slice(contentStart, contentEnd)
-          : totalAssistantContent.slice(contentStart);
-
-        const partsStart = startSplit?.parts || 0;
-        const partsEnd = endSplit?.parts;
-        const turnParts = partsEnd !== undefined
-          ? allParts.slice(partsStart, partsEnd)
-          : allParts.slice(partsStart);
-
-        result.push({
-          ...msg,
-          content: turnContent,
-          parts: turnParts,
-        } as Message);
-        assistantIndex++;
-      }
-    }
+      // Assistant response for this turn (turn index+1 since turn 0 is first response)
+      const turnParts = getPartsForTurn(index + 1);
+      result.push({
+        id: `assistant-turn-${index + 1}`,
+        role: "assistant",
+        content: "",
+        parts: turnParts,
+      } as Message);
+    });
 
     return result;
-  }, [streamMessages, streamAssistant, totalAssistantContent, followUpMessages, allParts]);
+  }, [streamMessages, followUpUserMessages, getPartsForTurn]);
 
-
-  // Status logic - SIMPLE:
-  // No messages = ready
-  // Last message is user = busy (waiting for response)
-  // Last message is empty assistant (placeholder) = busy (waiting for content)
-  // Last message is assistant with content = ready
+  // Status: streaming if last message is assistant with no parts
   const lastMessage = displayMessages[displayMessages.length - 1];
-  const hasSentMessage = displayMessages.length > 0;
-  const isEmptyAssistant = lastMessage?.role === "assistant" && !lastMessage?.content;
-  const isWaitingForResponse = hasSentMessage && (lastMessage?.role === "user" || isEmptyAssistant);
-  const effectiveStatus = isWaitingForResponse ? "streaming" : "ready";
-
+  const isWaiting =
+    displayMessages.length > 0 &&
+    (lastMessage?.role === "user" ||
+      (lastMessage?.role === "assistant" && lastMessage?.parts?.length === 0));
+  const effectiveStatus = isWaiting ? "streaming" : "ready";
 
   // Handle sending messages
   const handleSend = useCallback(
     async (text: string) => {
       if (!workflowRunId) {
-        // First message - start workflow via transport
+        // First message - start workflow
         await sendInitialMessage({ text, metadata: { createdAt: Date.now() } });
       } else {
         // Follow-up message
-        // Record the current content length and parts count as a split point
-        splitPoints.current.push({
-          content: totalAssistantContent.length,
-          parts: allParts.length,
-        });
+        // Record current parts count as boundary for next turn
+        turnBoundaries.current.push(allParts.length);
 
         // Add user message
         const userMessage: Message = {
@@ -178,18 +147,9 @@ export function WorkflowChat() {
           content: text,
           parts: [{ type: "text", text }],
         };
+        setFollowUpUserMessages((prev) => [...prev, userMessage]);
 
-        // Add placeholder for assistant response
-        const assistantPlaceholder: Message = {
-          id: `assistant-followup-${Date.now()}`,
-          role: "assistant",
-          content: "",
-          parts: [{ type: "text", text: "" }],
-        };
-
-        setFollowUpMessages(prev => [...prev, userMessage, assistantPlaceholder]);
-
-        // Resume the workflow hook
+        // Resume workflow
         const conversationId = getConversationId();
         try {
           await fetch(`/api/${encodeURIComponent(conversationId)}/stream/`, {
@@ -202,7 +162,7 @@ export function WorkflowChat() {
         }
       }
     },
-    [workflowRunId, sendInitialMessage, totalAssistantContent, allParts]
+    [workflowRunId, sendInitialMessage, allParts.length]
   );
 
   return (
