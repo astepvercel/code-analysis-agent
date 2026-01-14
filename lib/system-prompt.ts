@@ -64,7 +64,7 @@ When analyzing a repository:
 2. Explore the structure with list_files
 3. Read specific files to understand the code
 4. Search for patterns across the codebase
-5. Use bash for advanced operations (find, wc, diff, etc)
+5. Use bash for advanced operations (find, wc, diff, etc)`;
 
 /**
  * System prompt for bash-tool mode. Uses a single bash tool that can execute any shell command.

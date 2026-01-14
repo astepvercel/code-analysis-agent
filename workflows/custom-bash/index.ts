@@ -18,19 +18,71 @@ import { WORKFLOW_SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { MODEL_ID, log, TOOL_NAMES } from "@/lib/config";
 
 /**
- * Step function to emit a user message to the stream.
- * This allows the client to detect turn boundaries by scanning for user messages.
+ * customBashWorkflow - Durable multi-turn chat with sandbox tools
+ *
+ * HOW IT WORKS:
+ * 1. Creates a sandbox environment
+ * 2. Streams agent responses to client
+ * 3. Waits for follow-up messages via hook
+ * 4. Emits user messages to stream (so client can detect turn boundaries)
+ * 5. Loops until user sends "/done"
+ */
+export async function customBashWorkflow(
+  conversationId: string,
+  initMessages: UIMessage[]
+) {
+  "use workflow";
+
+  log.workflow("Starting conversation:", conversationId);
+
+  // Setup
+  const sandboxId = await createSandbox();
+  const tools = createTools(sandboxId);
+  const writable = getWritable<UIMessageChunk>();
+  const chatHook = chatMessageHook.create({ token: conversationId });
+  const messages = await convertToModelMessages(initMessages);
+
+  const agent = new DurableAgent({
+    model: MODEL_ID,
+    system: WORKFLOW_SYSTEM_PROMPT,
+    tools,
+  });
+
+  // Main conversation loop
+  while (true) {
+    // Stream agent response
+    const { messages: result } = await agent.stream({
+      messages,
+      writable,
+      preventClose: true,
+    });
+    messages.push(...result.slice(messages.length));
+
+    // Wait for user's next message
+    const { message } = await chatHook;
+    if (message === "/done") break;
+
+    // Emit user message to stream (client uses this to split turns)
+    await emitUserMessage(message);
+
+    // Add to history and continue
+    messages.push({ role: "user", content: message });
+  }
+
+  return { messages };
+}
+
+/**
+ * Emit user message to stream as a data chunk.
+ * Client scans for these to detect turn boundaries.
  */
 async function emitUserMessage(text: string) {
   "use step";
-
-  log.step("emit-user", "Emitting user message to stream");
 
   const writable = getWritable<UIMessageChunk>();
   const writer = writable.getWriter();
 
   try {
-    // Emit user message as custom data chunk - client uses this to mark turn boundaries
     await writer.write({
       type: "data-user-message",
       data: { text },
@@ -38,40 +90,32 @@ async function emitUserMessage(text: string) {
   } finally {
     writer.releaseLock();
   }
-
-  return { success: true };
 }
 
+/**
+ * Create sandbox tools for the agent
+ */
 function createTools(sandboxId: string) {
   return {
     [TOOL_NAMES.gitClone]: tool({
-      description:
-        "Clone a GitHub repository. Only needs to be done once per repo.",
+      description: "Clone a GitHub repository. Only needs to be done once per repo.",
       inputSchema: z.object({
         repoUrl: z.string().describe("GitHub repository URL"),
         destination: z.string().optional().describe("Directory name"),
       }),
-      execute: async ({ repoUrl, destination }) => {
-        return cloneRepository({ repoUrl, destination, sandboxId });
-      },
+      execute: ({ repoUrl, destination }) =>
+        cloneRepository({ repoUrl, destination, sandboxId }),
     }),
 
     [TOOL_NAMES.listFiles]: tool({
       description: "List files and directories in a given path in the sandbox.",
       inputSchema: z.object({
-        path: z
-          .string()
-          .optional()
-          .describe("Directory path to list (defaults to current dir)"),
+        path: z.string().optional().describe("Directory path (defaults to current)"),
         recursive: z.boolean().optional().describe("List files recursively"),
-        maxDepth: z
-          .number()
-          .optional()
-          .describe("Max depth for recursive listing (default 3)"),
+        maxDepth: z.number().optional().describe("Max depth for recursive listing"),
       }),
-      execute: async ({ path, recursive, maxDepth }) => {
-        return listDirectory({ path, recursive, maxDepth, sandboxId });
-      },
+      execute: ({ path, recursive, maxDepth }) =>
+        listDirectory({ path, recursive, maxDepth, sandboxId }),
     }),
 
     [TOOL_NAMES.readFile]: tool({
@@ -79,9 +123,7 @@ function createTools(sandboxId: string) {
       inputSchema: z.object({
         path: z.string().describe("Path to the file to read"),
       }),
-      execute: async ({ path }) => {
-        return readFile({ path, sandboxId });
-      },
+      execute: ({ path }) => readFile({ path, sandboxId }),
     }),
 
     [TOOL_NAMES.searchFiles]: tool({
@@ -91,9 +133,8 @@ function createTools(sandboxId: string) {
         path: z.string().default(".").describe("Directory to search"),
         filePattern: z.string().optional().describe("File filter (e.g., '*.js')"),
       }),
-      execute: async ({ pattern, path, filePattern }) => {
-        return searchFiles({ pattern, path, filePattern, sandboxId });
-      },
+      execute: ({ pattern, path, filePattern }) =>
+        searchFiles({ pattern, path, filePattern, sandboxId }),
     }),
 
     [TOOL_NAMES.bash]: tool({
@@ -101,65 +142,7 @@ function createTools(sandboxId: string) {
       inputSchema: z.object({
         command: z.string().describe("The bash command to execute"),
       }),
-      execute: async ({ command }) => {
-        return runBash({ command, sandboxId });
-      },
+      execute: ({ command }) => runBash({ command, sandboxId }),
     }),
   };
-}
-
-export async function customBashWorkflow(
-  conversationId: string,
-  initMessages: UIMessage[]
-) {
-  "use workflow";
-
-  log.workflow("Starting conversation:", conversationId);
-
-  const sandboxId = await createSandbox();
-  log.workflow("Sandbox ID:", sandboxId);
-
-  const tools = createTools(sandboxId);
-  const writable = getWritable<UIMessageChunk>();
-
-  const agent = new DurableAgent({
-    model: MODEL_ID,
-    system: WORKFLOW_SYSTEM_PROMPT,
-    tools,
-  });
-  log.workflow("Agent initialized with tools");
-
-  const chatHook = chatMessageHook.create({ token: conversationId });
-  const messages = await convertToModelMessages(initMessages);
-
-  while (true) {
-    log.workflow("Processing message (history length:", messages.length, ")");
-
-    const { messages: result } = await agent.stream({
-      messages: messages,
-      writable,
-      preventClose: true,
-    });
-
-    messages.push(...result.slice(messages.length));
-    log.workflow("Response sent, waiting for next message...");
-
-    const { message } = await chatHook;
-    log.workflow("Received follow-up message:", message);
-
-    if (message === "/done") {
-      log.workflow("Conversation ended by user");
-      break;
-    }
-
-    // Emit user message to stream (client uses this to detect turn boundaries)
-    await emitUserMessage(message);
-
-    // Add to history for context
-    messages.push({ role: "user", content: message });
-    log.workflow("User message added to history, processing...");
-  }
-
-  log.workflow("Conversation complete");
-  return { messages };
 }

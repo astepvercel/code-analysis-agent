@@ -9,14 +9,19 @@ import { STORAGE_KEYS } from "@/lib/config";
 import type { Message } from "../client/types";
 
 /**
- * Multi-turn workflow chat.
+ * WorkflowChat - Multi-turn chat using Vercel Workflows
  *
- * Simple approach inspired by flight booking example:
- * - User messages are emitted to stream as data-user-message chunks
- * - Client scans parts for these chunks to detect turn boundaries
- * - No manual tracking needed - turns are self-evident in the stream
+ * HOW IT WORKS:
+ * 1. All content streams into a single assistant message's `parts` array
+ * 2. User follow-ups are emitted to stream as `data-user-message` chunks
+ * 3. Client scans parts for these chunks to split into separate turns
+ *
+ * STREAM STRUCTURE:
+ * [text][tool][tool] → [data-user-message] → [text][tool] → [data-user-message] → [text]
+ *  └── Turn 1 ────┘    └─ "follow up" ──┘    └─ Turn 2 ─┘   └── "another" ────┘   └ T3 ┘
  */
 export function WorkflowChat() {
+  // Track workflow run ID for follow-up messages
   const [workflowRunId, setWorkflowRunId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       return sessionStorage.getItem(STORAGE_KEYS.workflowRunId);
@@ -24,17 +29,15 @@ export function WorkflowChat() {
     return null;
   });
 
+  // Configure transport to capture workflow run ID from response headers
   const transport = useMemo(
     () =>
       new WorkflowChatTransport({
         api: "/api/chat",
-        prepareSendMessagesRequest: ({ messages, ...rest }) => {
-          const conversationId = getConversationId();
-          return {
-            ...rest,
-            body: { messages, conversationId },
-          };
-        },
+        prepareSendMessagesRequest: ({ messages, ...rest }) => ({
+          ...rest,
+          body: { messages, conversationId: getConversationId() },
+        }),
         onChatSendMessage: (response: Response) => {
           const runId = response.headers.get("x-workflow-run-id");
           if (runId) {
@@ -46,108 +49,73 @@ export function WorkflowChat() {
     []
   );
 
-  const {
-    messages: streamMessages,
-    sendMessage: sendInitialMessage,
-    status,
-  } = useChat({
+  const { messages: streamMessages, sendMessage, status } = useChat({
     transport: transport as any,
   });
 
-  // Get assistant message and all parts from stream
-  const streamAssistant = useMemo(
-    () => streamMessages.find((m) => m.role === "assistant"),
-    [streamMessages]
-  );
-  const allParts = useMemo(
-    () => streamAssistant?.parts || [],
-    [streamAssistant]
-  );
+  // Extract parts from the assistant message
+  const assistantMessage = streamMessages.find((m) => m.role === "assistant");
+  const allParts = assistantMessage?.parts || [];
 
-  // Build display messages by scanning parts for user message chunks
+  // Build display messages by splitting on user message chunks
   const displayMessages = useMemo(() => {
     const result: Message[] = [];
 
-    // First user message (from initial send via useChat)
+    // Add initial user message
     const firstUser = streamMessages.find((m) => m.role === "user");
     if (firstUser) {
       result.push(firstUser as Message);
     }
 
-    // Scan parts and split on user message chunks
-    let currentAssistantParts: any[] = [];
+    // Scan parts: split on data-user-message chunks
+    let assistantParts: any[] = [];
 
     for (const part of allParts) {
-      const partAny = part as any;
-      if (partAny.type === "data-user-message" && partAny.data?.text) {
-        const userText = partAny.data.text as string;
-        // End current assistant turn
-        if (currentAssistantParts.length > 0 || result.length > 0) {
-          result.push({
-            id: `assistant-${result.length}`,
-            role: "assistant",
-            content: "",
-            parts: currentAssistantParts,
-          } as Message);
+      const p = part as any;
+
+      if (p.type === "data-user-message" && p.data?.text) {
+        // Found user message = end of assistant turn
+        if (assistantParts.length > 0 || result.length > 0) {
+          result.push(createAssistantMessage(result.length, assistantParts));
         }
-
-        // Add user message from stream
-        result.push({
-          id: `user-${result.length}`,
-          role: "user",
-          content: userText,
-          parts: [{ type: "text", text: userText }],
-        } as Message);
-
-        currentAssistantParts = []; // Reset for next turn
+        result.push(createUserMessage(result.length, p.data.text));
+        assistantParts = [];
       } else {
-        currentAssistantParts.push(part);
+        assistantParts.push(part);
       }
     }
 
-    // Add final assistant turn (current/in-progress response)
-    if (currentAssistantParts.length > 0 || result[result.length - 1]?.role === "user") {
-      result.push({
-        id: `assistant-${result.length}`,
-        role: "assistant",
-        content: "",
-        parts: currentAssistantParts,
-      } as Message);
+    // Add final/current assistant turn
+    if (assistantParts.length > 0 || result[result.length - 1]?.role === "user") {
+      result.push(createAssistantMessage(result.length, assistantParts));
     }
 
     return result;
   }, [streamMessages, allParts]);
 
-  // Status: streaming if last message is user or assistant with no parts
+  // Determine if we're waiting for a response
   const lastMessage = displayMessages[displayMessages.length - 1];
   const isWaiting =
-    displayMessages.length > 0 &&
-    (lastMessage?.role === "user" ||
-      (lastMessage?.role === "assistant" && lastMessage?.parts?.length === 0));
+    lastMessage?.role === "user" ||
+    (lastMessage?.role === "assistant" && !lastMessage.parts?.length);
   const effectiveStatus = isWaiting ? "streaming" : "ready";
 
-  // Handle sending messages
+  // Send message handler
   const handleSend = useCallback(
     async (text: string) => {
       if (!workflowRunId) {
-        // First message - start workflow
-        await sendInitialMessage({ text, metadata: { createdAt: Date.now() } });
+        // First message: start workflow
+        await sendMessage({ text, metadata: { createdAt: Date.now() } });
       } else {
-        // Follow-up - just resume the workflow hook
-        // User message will appear in stream via data-user-message chunk
-        const conversationId = getConversationId();
-        try {
-          await fetch(`/api/${encodeURIComponent(conversationId)}/stream/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text }),
-          });
-        } catch (error) {
-          console.error("[WorkflowChat] Hook resume failed:", error);
-        }
+        // Follow-up: resume workflow hook (user message appears via stream)
+        await fetch(`/api/${encodeURIComponent(getConversationId())}/stream/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        });
       }
     },
-    [workflowRunId, sendInitialMessage]
+    [workflowRunId, sendMessage]
   );
 
   return (
@@ -158,4 +126,19 @@ export function WorkflowChat() {
       mode="workflow"
     />
   );
+}
+
+// Helper: create assistant message
+function createAssistantMessage(index: number, parts: any[]): Message {
+  return { id: `assistant-${index}`, role: "assistant", content: "", parts };
+}
+
+// Helper: create user message
+function createUserMessage(index: number, text: string): Message {
+  return {
+    id: `user-${index}`,
+    role: "user",
+    content: text,
+    parts: [{ type: "text", text }],
+  };
 }
