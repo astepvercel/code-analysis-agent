@@ -10,8 +10,6 @@ vercel env pull
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
-
 ## Two Architectures
 
 This demo shows two approaches to building AI agents with Vercel infrastructure:
