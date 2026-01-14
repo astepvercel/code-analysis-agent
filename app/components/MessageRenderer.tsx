@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { MessagePart } from "../client/types";
+import { UI_CONFIG } from '@/lib/config';
 
 export function MessagePartRenderer({ part }: { part: MessagePart }) {
   if (part.type === 'text' && part.text) {
@@ -32,7 +33,11 @@ export function MessagePartRenderer({ part }: { part: MessagePart }) {
           <span className="tool-name">{toolName}</span>
         </div>
         {command && (
-          <code className="tool-command-preview">{command.length > 80 ? `${command.slice(0, 80)}...` : command}</code>
+          <code className="tool-command-preview">
+            {command.length > UI_CONFIG.commandPreviewLength
+              ? `${command.slice(0, UI_CONFIG.commandPreviewLength)}...`
+              : command}
+          </code>
         )}
 
         {part.input ? (

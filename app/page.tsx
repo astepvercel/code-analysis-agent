@@ -1,43 +1,61 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import type { BashImplementation } from "./client/types";
+import { useState, useEffect, useCallback } from "react";
+import type { AgentMode } from "./client/types";
 import {
-  getImplementation,
-  setImplementation,
+  getAgentMode,
+  setAgentMode,
   clearConversation,
 } from "./client/session";
 import { BashToolChat } from "./components/BashToolChat";
 import { WorkflowChat } from "./components/WorkflowChat";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { STORAGE_KEYS } from "@/lib/config";
 
 export default function ChatPage() {
-  const [currentMode, setCurrentMode] = useState<BashImplementation>("bash-tool");
+  const [currentMode, setCurrentMode] = useState<AgentMode>("bash-tool");
   const [mounted, setMounted] = useState(false);
+  const [pendingMode, setPendingMode] = useState<AgentMode | null>(null);
 
   useEffect(() => {
-    setCurrentMode(getImplementation());
+    setCurrentMode(getAgentMode());
     setMounted(true);
   }, []);
 
-  const handleModeSwitch = (newMode: BashImplementation) => {
+  const hasActiveSession = useCallback(() => {
+    return !!(
+      sessionStorage.getItem(STORAGE_KEYS.workflowRunId) ||
+      sessionStorage.getItem(STORAGE_KEYS.conversationId)
+    );
+  }, []);
+
+  const handleModeSwitch = (newMode: AgentMode) => {
     if (newMode === currentMode) return;
 
-    const hasActiveSession =
-      sessionStorage.getItem(STORAGE_KEYS.workflowRunId) ||
-      sessionStorage.getItem(STORAGE_KEYS.conversationId);
-
-    if (
-      hasActiveSession &&
-      !confirm("Switching modes requires a new conversation. Continue?")
-    ) {
-      return;
+    if (hasActiveSession()) {
+      // Show confirmation dialog
+      setPendingMode(newMode);
+    } else {
+      // No active session, switch immediately
+      performModeSwitch(newMode);
     }
+  };
 
+  const performModeSwitch = (newMode: AgentMode) => {
     clearConversation();
-    setImplementation(newMode);
+    setAgentMode(newMode);
     setCurrentMode(newMode);
     window.location.reload();
+  };
+
+  const handleConfirmSwitch = () => {
+    if (pendingMode) {
+      performModeSwitch(pendingMode);
+    }
+  };
+
+  const handleCancelSwitch = () => {
+    setPendingMode(null);
   };
 
   const startNewConversation = () => {
@@ -45,9 +63,7 @@ export default function ChatPage() {
     window.location.reload();
   };
 
-  if (!mounted) {
-    return <div className="page loading">Loading...</div>;
-  }
+  if (!mounted) return null;
 
   return (
     <div className="page">
@@ -70,8 +86,8 @@ export default function ChatPage() {
               bash-tool
             </button>
             <button
-              className={currentMode === "custom" ? "active" : ""}
-              onClick={() => handleModeSwitch("custom")}
+              className={currentMode === "workflow" ? "active" : ""}
+              onClick={() => handleModeSwitch("workflow")}
             >
               Workflow
             </button>
@@ -85,6 +101,16 @@ export default function ChatPage() {
       <main>
         {currentMode === "bash-tool" ? <BashToolChat /> : <WorkflowChat />}
       </main>
+
+      <ConfirmDialog
+        isOpen={pendingMode !== null}
+        title="Switch Mode?"
+        message="Switching modes requires starting a new conversation. Your current conversation will be cleared."
+        confirmLabel="Switch Mode"
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmSwitch}
+        onCancel={handleCancelSwitch}
+      />
     </div>
   );
 }

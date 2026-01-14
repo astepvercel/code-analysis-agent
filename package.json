@@ -1,5 +1,5 @@
 {
-  "name": "demo-v2",
+  "name": "code-analysis-agent",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,32 +10,16 @@
   },
   "dependencies": {
     "@ai-sdk/react": "2.0.60",
-    "@radix-ui/react-collapsible": "^1.1.12",
-    "@radix-ui/react-slot": "^1.2.4",
-    "@types/react-syntax-highlighter": "^15.5.13",
     "@vercel/sandbox": "^1.1.2",
     "@workflow/ai": "4.0.1-beta.44",
     "ai": "^6.0.0",
     "bash-tool": "^1.3.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
-    "dotenv": "^17.2.3",
-    "lucide-react": "^0.562.0",
-    "motion": "^12.23.26",
     "ms": "^2.1.3",
-    "nanoid": "^5.1.6",
     "next": "16.0.10",
-    "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
-    "react-syntax-highlighter": "^16.1.0",
     "remark-gfm": "^4.0.1",
-    "sandbox": "^1.0.10",
-    "streamdown": "^1.6.10",
-    "tailwind-merge": "^3.4.0",
-    "tsx": "^4.21.0",
     "workflow": "4.0.1-beta.44",
     "zod": "4.1.12"
   },
@@ -48,6 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

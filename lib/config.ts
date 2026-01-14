@@ -5,45 +5,53 @@ import ms from "ms";
  */
 
 // Model configuration
-export const MODEL_ID = "anthropic/claude-haiku-4.5" as const;
+export const MODEL_ID = "anthropic/claude-haiku-4.5";
 
 // Sandbox configuration - shared across all modes
 export const SANDBOX_CONFIG = {
   timeout: ms("20m"),
   vcpus: 2,
-  runtime: "node22" as const,
+  runtime: "node22",
   workspacePath: "/vercel/sandbox/workspace",
-} as const;
+};
+
+// Agent configuration
+export const AGENT_CONFIG = {
+  maxSteps: 50,
+};
+
+// Workflow configuration
+export const WORKFLOW_CONFIG = {
+  maxConversationTurns: 100
+};
+
+// UI configuration
+export const UI_CONFIG = {
+  /** Pixels from bottom to trigger auto-scroll during streaming */
+  autoScrollThreshold: 100,
+  /** Maximum characters to show in command preview before truncating */
+  commandPreviewLength: 80,
+};
 
 // Session storage keys
 export const STORAGE_KEYS = {
   conversationId: "conversation-id",
   workflowRunId: "workflow-run-id",
-  implementation: "bash-implementation",
-  chatHistory: "chat-history",
-} as const;
+  agentMode: "agent-mode",
+  sandboxId: "sandbox-id",
+};
 
-/**
- * Step names for consistent logging.
- *
- * Convention: kebab-case for all step identifiers.
- * Used in log.step(STEP_NAMES.bash, "message")
- */
+// Step names for logging
 export const STEP_NAMES = {
   bash: "bash",
   gitClone: "git-clone",
   readFile: "read-file",
   listDirectory: "list-directory",
   searchFiles: "search-files",
-} as const;
+};
 
 /**
  * Tool names as exposed to the AI model.
- *
- * ## Naming Convention
- *
- * Tool names use snake_case (AI SDK convention) while internal
- * function names use camelCase (TypeScript convention).
  *
  * Mapping:
  * - git_clone    → cloneRepository()
@@ -58,11 +66,10 @@ export const TOOL_NAMES = {
   readFile: "read_file",
   searchFiles: "search_files",
   bash: "bash",
-} as const;
+};
 
 /**
- * Consistent logging utility.
- * All logs follow the pattern: [Context] message
+ * Consistent logging utility - logs follow the pattern: [Context] message
  */
 export const log = {
   api: (message: string, ...args: unknown[]) =>
@@ -79,4 +86,4 @@ export const log = {
 
   error: (context: string, message: string, ...args: unknown[]) =>
     console.error(`[${context}] ERROR: ${message}`, ...args),
-} as const;
+};
