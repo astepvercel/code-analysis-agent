@@ -18,21 +18,23 @@ import { WORKFLOW_SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { MODEL_ID, log, TOOL_NAMES } from "@/lib/config";
 
 /**
- * Step function to emit signals to the stream for a new assistant message turn.
- * This signals to the client that a new assistant message is beginning.
- * Must be a step because getWriter() is not supported in workflow functions.
+ * Step function to emit a user message to the stream.
+ * This allows the client to detect turn boundaries by scanning for user messages.
  */
-async function emitNewMessageSignals() {
+async function emitUserMessage(text: string) {
   "use step";
 
-  log.step("emit-start", "Emitting signals for new message turn");
+  log.step("emit-user", "Emitting user message to stream");
 
   const writable = getWritable<UIMessageChunk>();
   const writer = writable.getWriter();
 
   try {
-    // Emit start signal to indicate new message, similar to how doStreamStep does it
-    await writer.write({ type: "start" } as UIMessageChunk);
+    // Emit user message as custom data chunk - client uses this to mark turn boundaries
+    await writer.write({
+      type: "data-user-message",
+      data: { text },
+    } as unknown as UIMessageChunk);
   } finally {
     writer.releaseLock();
   }
@@ -130,16 +132,8 @@ export async function customBashWorkflow(
   const chatHook = chatMessageHook.create({ token: conversationId });
   const messages = await convertToModelMessages(initMessages);
 
-  let isFirstTurn = true;
-
   while (true) {
     log.workflow("Processing message (history length:", messages.length, ")");
-
-    // For subsequent turns, emit signals to indicate new assistant message
-    if (!isFirstTurn) {
-      await emitNewMessageSignals();
-    }
-    isFirstTurn = false;
 
     const { messages: result } = await agent.stream({
       messages: messages,
@@ -158,7 +152,10 @@ export async function customBashWorkflow(
       break;
     }
 
-    // User message is managed by the client - just add to history for context
+    // Emit user message to stream (client uses this to detect turn boundaries)
+    await emitUserMessage(message);
+
+    // Add to history for context
     messages.push({ role: "user", content: message });
     log.workflow("User message added to history, processing...");
   }

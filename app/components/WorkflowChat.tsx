@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { WorkflowChatTransport } from "@workflow/ai";
 import { ChatUI } from "./ChatUI";
@@ -11,11 +11,10 @@ import type { Message } from "../client/types";
 /**
  * Multi-turn workflow chat.
  *
- * SIMPLIFIED APPROACH:
- * - Track turn boundaries by part index only (no content-length tracking)
- * - turnBoundaries[0] = part index where turn 1 starts
- * - Turn 0: parts[0..turnBoundaries[0])
- * - Turn N: parts[turnBoundaries[N-1]..turnBoundaries[N])
+ * Simple approach inspired by flight booking example:
+ * - User messages are emitted to stream as data-user-message chunks
+ * - Client scans parts for these chunks to detect turn boundaries
+ * - No manual tracking needed - turns are self-evident in the stream
  */
 export function WorkflowChat() {
   const [workflowRunId, setWorkflowRunId] = useState<string | null>(() => {
@@ -24,13 +23,6 @@ export function WorkflowChat() {
     }
     return null;
   });
-
-  // User's follow-up messages (we derive assistant content from parts)
-  const [followUpUserMessages, setFollowUpUserMessages] = useState<Message[]>([]);
-
-  // Part indices where each new turn starts
-  // turnBoundaries[0] = index where turn 1 starts, etc.
-  const turnBoundaries = useRef<number[]>([]);
 
   const transport = useMemo(
     () =>
@@ -62,7 +54,7 @@ export function WorkflowChat() {
     transport: transport as any,
   });
 
-  // Get assistant message and parts from stream
+  // Get assistant message and all parts from stream
   const streamAssistant = useMemo(
     () => streamMessages.find((m) => m.role === "assistant"),
     [streamMessages]
@@ -72,56 +64,61 @@ export function WorkflowChat() {
     [streamAssistant]
   );
 
-  // Helper: get parts for a specific turn
-  const getPartsForTurn = useCallback(
-    (turnIndex: number) => {
-      const start = turnIndex === 0 ? 0 : turnBoundaries.current[turnIndex - 1];
-      const end = turnBoundaries.current[turnIndex];
-      return end !== undefined ? allParts.slice(start, end) : allParts.slice(start);
-    },
-    [allParts]
-  );
-
-  // Build display messages
+  // Build display messages by scanning parts for user message chunks
   const displayMessages = useMemo(() => {
     const result: Message[] = [];
 
-    // First user message
+    // First user message (from initial send via useChat)
     const firstUser = streamMessages.find((m) => m.role === "user");
     if (firstUser) {
       result.push(firstUser as Message);
     }
 
-    // First assistant turn (turn 0)
-    const turn0Parts = getPartsForTurn(0);
-    if (turn0Parts.length > 0 || followUpUserMessages.length > 0) {
+    // Scan parts and split on user message chunks
+    let currentAssistantParts: any[] = [];
+
+    for (const part of allParts) {
+      const partAny = part as any;
+      if (partAny.type === "data-user-message" && partAny.data?.text) {
+        const userText = partAny.data.text as string;
+        // End current assistant turn
+        if (currentAssistantParts.length > 0 || result.length > 0) {
+          result.push({
+            id: `assistant-${result.length}`,
+            role: "assistant",
+            content: "",
+            parts: currentAssistantParts,
+          } as Message);
+        }
+
+        // Add user message from stream
+        result.push({
+          id: `user-${result.length}`,
+          role: "user",
+          content: userText,
+          parts: [{ type: "text", text: userText }],
+        } as Message);
+
+        currentAssistantParts = []; // Reset for next turn
+      } else {
+        currentAssistantParts.push(part);
+      }
+    }
+
+    // Add final assistant turn (current/in-progress response)
+    if (currentAssistantParts.length > 0 || result[result.length - 1]?.role === "user") {
       result.push({
-        id: "assistant-turn-0",
+        id: `assistant-${result.length}`,
         role: "assistant",
-        content: "", // Content derived from parts by renderer
-        parts: turn0Parts,
+        content: "",
+        parts: currentAssistantParts,
       } as Message);
     }
 
-    // Follow-up turns: interleave user messages with assistant responses
-    followUpUserMessages.forEach((userMsg, index) => {
-      // User message
-      result.push(userMsg);
-
-      // Assistant response for this turn (turn index+1 since turn 0 is first response)
-      const turnParts = getPartsForTurn(index + 1);
-      result.push({
-        id: `assistant-turn-${index + 1}`,
-        role: "assistant",
-        content: "",
-        parts: turnParts,
-      } as Message);
-    });
-
     return result;
-  }, [streamMessages, followUpUserMessages, getPartsForTurn]);
+  }, [streamMessages, allParts]);
 
-  // Status: streaming if last message is assistant with no parts
+  // Status: streaming if last message is user or assistant with no parts
   const lastMessage = displayMessages[displayMessages.length - 1];
   const isWaiting =
     displayMessages.length > 0 &&
@@ -136,20 +133,8 @@ export function WorkflowChat() {
         // First message - start workflow
         await sendInitialMessage({ text, metadata: { createdAt: Date.now() } });
       } else {
-        // Follow-up message
-        // Record current parts count as boundary for next turn
-        turnBoundaries.current.push(allParts.length);
-
-        // Add user message
-        const userMessage: Message = {
-          id: `user-followup-${Date.now()}`,
-          role: "user",
-          content: text,
-          parts: [{ type: "text", text }],
-        };
-        setFollowUpUserMessages((prev) => [...prev, userMessage]);
-
-        // Resume workflow
+        // Follow-up - just resume the workflow hook
+        // User message will appear in stream via data-user-message chunk
         const conversationId = getConversationId();
         try {
           await fetch(`/api/${encodeURIComponent(conversationId)}/stream/`, {
@@ -162,7 +147,7 @@ export function WorkflowChat() {
         }
       }
     },
-    [workflowRunId, sendInitialMessage, allParts.length]
+    [workflowRunId, sendInitialMessage]
   );
 
   return (
