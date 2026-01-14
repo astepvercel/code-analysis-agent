@@ -612,7 +612,6 @@ main {
   border-color: rgba(34, 197, 94, 0.3);
 }
 
-.tool-call.pending,
 .tool-call.running {
   border-color: rgba(234, 179, 8, 0.3);
 }
@@ -653,10 +652,6 @@ main {
   background: var(--success);
 }
 
-.tool-call.pending .tool-status-dot {
-  background: var(--text-muted);
-}
-
 .tool-call.running .tool-status-dot {
   background: var(--warning);
   animation: tool-pulse 1s ease-in-out infinite;
@@ -667,14 +662,8 @@ main {
 }
 
 @keyframes tool-pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(1.2);
-  }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.2); }
 }
 
 .tool-status-text {
@@ -683,10 +672,6 @@ main {
 
 .tool-call.complete .tool-status-text {
   color: var(--success);
-}
-
-.tool-call.pending .tool-status-text {
-  color: var(--text-muted);
 }
 
 .tool-call.running .tool-status-text {

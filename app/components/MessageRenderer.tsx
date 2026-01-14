@@ -141,21 +141,27 @@ function formatOutput(output: unknown): string {
 
 /**
  * Get tool state label and CSS class
- * States from AI SDK: input-streaming → input-available → output-available/output-error
+ *
+ * AI SDK states vary by mode:
+ * - Workflow: may use input-streaming, input-available, output-available
+ * - Bash-tool: uses executing, output-available, done, output-error
  */
 function getToolState(state?: string): { label: string; className: string } {
-  switch (state) {
-    case 'input-streaming':
-      return { label: 'Pending', className: 'pending' };
-    case 'input-available':
-    case 'executing':
-      return { label: 'Running', className: 'running' };
-    case 'output-available':
-    case 'done':
-      return { label: 'Completed', className: 'complete' };
-    case 'output-error':
-      return { label: 'Failed', className: 'error' };
-    default:
-      return { label: 'Running', className: 'running' };
+  // Completed states
+  if (state === 'output-available' || state === 'done') {
+    return { label: 'Completed', className: 'complete' };
   }
+
+  // Error state
+  if (state === 'output-error') {
+    return { label: 'Failed', className: 'error' };
+  }
+
+  // Running states (tool is executing)
+  if (state === 'executing' || state === 'input-available') {
+    return { label: 'Running', className: 'running' };
+  }
+
+  // Default: still running/pending (input-streaming or undefined)
+  return { label: 'Running', className: 'running' };
 }
