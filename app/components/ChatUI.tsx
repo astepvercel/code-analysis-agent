@@ -89,7 +89,7 @@ export function ChatUI({ messages, status, onSend, mode }: ChatUIProps) {
             </div>
           ))
         )}
-        {isStreaming && messages.length > 0 && <StreamingIndicator />}
+        {(status === 'submitted' || isStreaming) && <StreamingIndicator />}
       </div>
 
       <div className="input-container">
@@ -121,8 +121,6 @@ function EmptyState({ mode }: { mode: AgentMode }) {
     "Clone https://github.com/vercel/ai and explain the architecture",
     "Find all API routes and show me how error handling works",
     "What design patterns are used? Show me examples from the code",
-    "Analyze the test coverage and suggest what's missing",
-    "Compare the authentication flow across different files",
   ];
 
   return (
