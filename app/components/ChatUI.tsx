@@ -90,10 +90,9 @@ export function ChatUI({ messages, status, onSend, mode }: ChatUIProps) {
         )}
         {isBusy && (
           mode === 'workflow'
-            ? <>
-                <WorkflowLoadingIndicator isFirstMessage={isFirstMessage} />
-                <StreamingIndicator />
-              </>
+            ? (isFirstMessage
+                ? <><WorkflowLoadingIndicator isFirstMessage={isFirstMessage} /><StreamingIndicator /></>
+                : <StreamingIndicator />)
             : <StreamingIndicator />
         )}
       </div>

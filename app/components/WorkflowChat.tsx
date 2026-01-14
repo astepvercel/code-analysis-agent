@@ -25,7 +25,11 @@ export function WorkflowChat() {
 
   // Follow-up messages we add locally (user messages + assistant responses after first turn)
   const [followUpMessages, setFollowUpMessages] = useState<Message[]>([]);
-  const assistantContentLengthAtSplit = useRef(0);
+
+  // Track split points - array of content lengths where each turn ends
+  // splitPoints[0] = where first assistant response ends
+  // splitPoints[1] = where second assistant response ends, etc.
+  const splitPoints = useRef<number[]>([]);
 
   // Transport for initial message
   const transport = useMemo(
@@ -73,18 +77,20 @@ export function WorkflowChat() {
       result.push(firstUser as Message);
     }
 
-    // Add first assistant response (content up to split point, or all if no follow-ups)
+    // Add first assistant response
     if (streamAssistant) {
-      const firstAssistantContent = followUpMessages.length > 0
-        ? totalAssistantContent.slice(0, assistantContentLengthAtSplit.current)
+      // First assistant content: from 0 to first split point (or all if no follow-ups)
+      const firstSplitPoint = splitPoints.current[0];
+      const firstAssistantContent = firstSplitPoint !== undefined
+        ? totalAssistantContent.slice(0, firstSplitPoint)
         : totalAssistantContent;
 
-      if (firstAssistantContent) {
+      if (firstAssistantContent || splitPoints.current.length > 0) {
         result.push({
           id: "assistant-turn-1",
           role: "assistant",
           content: firstAssistantContent,
-          parts: followUpMessages.length > 0
+          parts: firstSplitPoint !== undefined
             ? [{ type: "text", text: firstAssistantContent }]
             : streamAssistant.parts,
         } as Message);
@@ -92,19 +98,24 @@ export function WorkflowChat() {
     }
 
     // Add follow-up messages (user messages + their assistant responses)
-    let contentOffset = assistantContentLengthAtSplit.current;
+    let assistantIndex = 0; // Track which assistant placeholder we're on
     for (const msg of followUpMessages) {
       if (msg.role === "user") {
         result.push(msg);
       } else if (msg.role === "assistant") {
         // Get this assistant turn's content from the stream
-        const turnContent = totalAssistantContent.slice(contentOffset);
+        const startPoint = splitPoints.current[assistantIndex] || 0;
+        const endPoint = splitPoints.current[assistantIndex + 1];
+        const turnContent = endPoint !== undefined
+          ? totalAssistantContent.slice(startPoint, endPoint)
+          : totalAssistantContent.slice(startPoint);
+
         result.push({
           ...msg,
           content: turnContent,
           parts: [{ type: "text", text: turnContent }],
         } as Message);
-        contentOffset = totalAssistantContent.length;
+        assistantIndex++;
       }
     }
 
@@ -117,9 +128,11 @@ export function WorkflowChat() {
 
     const lastFollowUp = followUpMessages[followUpMessages.length - 1];
     if (lastFollowUp.role === "assistant") {
-      // Content comes from stream, already handled in displayMessages useMemo
-      // Just trigger re-render by updating the message
-      const newContent = totalAssistantContent.slice(assistantContentLengthAtSplit.current);
+      // Get the start point for this assistant turn
+      const assistantCount = followUpMessages.filter(m => m.role === "assistant").length;
+      const startPoint = splitPoints.current[assistantCount - 1] || 0;
+      const newContent = totalAssistantContent.slice(startPoint);
+
       if (newContent && newContent !== lastFollowUp.content) {
         setFollowUpMessages(prev => prev.map((m, i) =>
           i === prev.length - 1 ? { ...m, content: newContent } : m
@@ -128,20 +141,16 @@ export function WorkflowChat() {
     }
   }, [totalAssistantContent, followUpMessages]);
 
-  // Status logic
-  // Show streaming indicator when:
-  // 1. Waiting for first response (last message is user)
-  // 2. OR actively streaming content (useChat status is streaming)
+  // Status logic - SIMPLE:
+  // No messages = ready
+  // Last message is user = busy (waiting for response)
+  // Last message is empty assistant (placeholder) = busy (waiting for content)
+  // Last message is assistant with content = ready
   const lastMessage = displayMessages[displayMessages.length - 1];
-  const hasSentMessage = displayMessages.length > 0 || status === "submitted";
-  const isWaitingForFirstToken = hasSentMessage && (lastMessage?.role === "user" || status === "submitted");
-  const isActivelyStreaming = status === "streaming";
-
-  //new
-  const isWaitingForResponse = lastMessage?.role === "user" || status === "submitted";
-  var effectiveStatus = isWaitingForResponse ? "streaming" : "ready";
-
-  const showStreamingIndicator = effectiveStatus || isActivelyStreaming;
+  const hasSentMessage = displayMessages.length > 0;
+  const isEmptyAssistant = lastMessage?.role === "assistant" && !lastMessage?.content;
+  const isWaitingForResponse = hasSentMessage && (lastMessage?.role === "user" || isEmptyAssistant);
+  const effectiveStatus = isWaitingForResponse ? "streaming" : "ready";
 
 
   // Handle sending messages
@@ -152,8 +161,8 @@ export function WorkflowChat() {
         await sendInitialMessage({ text, metadata: { createdAt: Date.now() } });
       } else {
         // Follow-up message
-        // Record where to split assistant content
-        assistantContentLengthAtSplit.current = totalAssistantContent.length;
+        // Record the current content length as a split point
+        splitPoints.current.push(totalAssistantContent.length);
 
         // Add user message
         const userMessage: Message = {
@@ -188,8 +197,6 @@ export function WorkflowChat() {
     },
     [workflowRunId, sendInitialMessage, totalAssistantContent]
   );
-
-  effectiveStatus = showStreamingIndicator ? "streaming" : "ready";
 
   return (
     <ChatUI
