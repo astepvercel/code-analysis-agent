@@ -64,7 +64,11 @@ When analyzing a repository:
 2. Explore the structure with list_files
 3. Read specific files to understand the code
 4. Search for patterns across the codebase
-5. Use bash for advanced operations (find, wc, diff, etc)`;
+5. Use bash for advanced operations (find, wc, diff, etc)
+
+## Tool Limitations
+
+If the user asks you to perform an action that requires a tool you don't have access to (such as writing files, editing code, or creating artifacts), clearly inform them that you don't have the capability to perform that action. Explain that you are designed for code analysis and exploration, not file creation or modification.`;
 
 /**
  * System prompt for bash-tool mode. Uses a single bash tool that can execute any shell command.
