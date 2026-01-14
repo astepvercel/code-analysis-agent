@@ -70,8 +70,7 @@ export function WorkflowChat() {
   // Get the full assistant content from stream (it's all concatenated)
   const totalAssistantContent = useMemo(() => {
     if (!streamAssistant) return "";
-    return streamAssistant.content ||
-      streamAssistant.parts?.filter((p: any) => p.type === "text").map((p: any) => p.text).join("") || "";
+    return streamAssistant.parts?.filter((p: any) => p.type === "text").map((p: any) => p.text).join("") || "";
   }, [streamAssistant]);
 
   // Get all parts from the stream assistant (memoized to prevent reference changes)
