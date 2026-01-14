@@ -474,6 +474,44 @@ main {
   }
 }
 
+/* Workflow Loading Indicator */
+.workflow-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.workflow-loading-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.workflow-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--text-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.workflow-status-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-width: 180px;
+}
+
 /* ==========================================================================
    Input
    ========================================================================== */

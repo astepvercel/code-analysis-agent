@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import type { Message } from "../client/types";
 import type { AgentMode } from "../client/types";
 import { MessagePartRenderer } from './MessageRenderer';
@@ -89,7 +89,11 @@ export function ChatUI({ messages, status, onSend, mode }: ChatUIProps) {
             </div>
           ))
         )}
-        {(status === 'submitted' || isStreaming) && <StreamingIndicator />}
+        {isBusy && (
+          mode === 'workflow'
+            ? <WorkflowLoadingIndicator isFirstMessage={messages.length <= 1} />
+            : <StreamingIndicator />
+        )}
       </div>
 
       <div className="input-container">
@@ -213,6 +217,47 @@ function StreamingIndicator() {
       <span className="dot" />
       <span className="dot" />
       <span className="dot" />
+    </div>
+  );
+}
+
+const FIRST_MESSAGE_STATUSES = [
+  "Starting workflow...",
+  "Creating sandbox environment...",
+  "Initializing agent...",
+  "Preparing tools...",
+  "Processing request...",
+];
+
+const FOLLOWUP_MESSAGE_STATUSES = [
+  "Processing request...",
+  "Thinking...",
+];
+
+function WorkflowLoadingIndicator({ isFirstMessage }: { isFirstMessage: boolean }) {
+  const [messageIndex, setMessageIndex] = useState(0);
+  const messages = isFirstMessage ? FIRST_MESSAGE_STATUSES : FOLLOWUP_MESSAGE_STATUSES;
+
+  useEffect(() => {
+    setMessageIndex(0);
+  }, [isFirstMessage]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageIndex((prev) =>
+        prev < messages.length - 1 ? prev + 1 : prev
+      );
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [messages.length]);
+
+  return (
+    <div className="workflow-loading">
+      <div className="workflow-loading-content">
+        <div className="workflow-spinner" />
+        <span className="workflow-status-text">{messages[messageIndex]}</span>
+      </div>
     </div>
   );
 }
