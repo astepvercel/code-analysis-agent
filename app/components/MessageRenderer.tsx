@@ -16,20 +16,16 @@ export function MessagePartRenderer({ part }: { part: MessagePart }) {
 
   if (part.type?.startsWith('tool-')) {
     const toolName = part.type.replace('tool-', '');
-    const isExecuting = part.state === 'executing';
-    const isComplete = part.state === 'output-available' || part.state === 'done';
-    const isError = part.state === 'output-error';
     const command = (part.input as { command?: string })?.command;
 
+    // Tool states (inspired by flight booking app)
+    const { label, className } = getToolState(part.state);
+
     return (
-      <div className={`tool-call ${isError ? 'error' : isComplete ? 'complete' : 'executing'}`}>
+      <div className={`tool-call ${className}`}>
         <div className="tool-header">
           <span className="tool-status-dot" />
-          <span className="tool-status-text">
-            {isExecuting && 'Executing'}
-            {isComplete && 'Completed'}
-            {isError && 'Failed'}
-          </span>
+          <span className="tool-status-text">{label}</span>
           <span className="tool-name">{toolName}</span>
         </div>
         {command && (
@@ -47,11 +43,11 @@ export function MessagePartRenderer({ part }: { part: MessagePart }) {
           </details>
         ) : null}
 
-        {isComplete && part.output ? (
+        {part.state === 'output-available' && part.output ? (
           <ToolOutputRenderer output={part.output} />
         ) : null}
 
-        {isError && part.errorText ? (
+        {part.state === 'output-error' && part.errorText ? (
           <div className="tool-error">Error: {part.errorText}</div>
         ) : null}
       </div>
@@ -141,4 +137,25 @@ function formatOutput(output: unknown): string {
   }
 
   return String(output);
+}
+
+/**
+ * Get tool state label and CSS class
+ * States from AI SDK: input-streaming → input-available → output-available/output-error
+ */
+function getToolState(state?: string): { label: string; className: string } {
+  switch (state) {
+    case 'input-streaming':
+      return { label: 'Pending', className: 'pending' };
+    case 'input-available':
+    case 'executing':
+      return { label: 'Running', className: 'running' };
+    case 'output-available':
+    case 'done':
+      return { label: 'Completed', className: 'complete' };
+    case 'output-error':
+      return { label: 'Failed', className: 'error' };
+    default:
+      return { label: 'Running', className: 'running' };
+  }
 }

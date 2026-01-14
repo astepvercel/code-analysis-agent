@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import type { Message } from "../client/types";
 import type { AgentMode } from "../client/types";
 import { MessagePartRenderer } from './MessageRenderer';
@@ -20,12 +20,8 @@ export function ChatUI({ messages, status, onSend, mode }: ChatUIProps) {
   const isSubmittingRef = useRef(false);
   const isStreaming = status === 'streaming';
 
-  // Busy when streaming or submitted (WorkflowChat now manages status correctly)
+  // Busy when streaming or submitted
   const isBusy = isStreaming || status === 'submitted';
-
-  // For workflow loading indicator: check if waiting for first response
-  const lastMessage = messages[messages.length - 1];
-  const isFirstMessage = messages.length <= 1;
 
   // Check if user is near bottom of scroll area
   const checkIfNearBottom = useCallback(() => {
@@ -71,29 +67,31 @@ export function ChatUI({ messages, status, onSend, mode }: ChatUIProps) {
         {messages.length === 0 ? (
           <EmptyState mode={mode} />
         ) : (
-          messages.map((message, index) => (
-            <div key={`${message.id}-${index}`} className={`message ${message.role}`}>
-              <div className="message-role">
-                {message.role === 'user' ? 'You' : 'Assistant'}
+          messages.map((message, index) => {
+            const isLastAssistant = message.role === 'assistant' && index === messages.length - 1;
+            const hasContent = message.parts?.some((p: any) => p.type === 'text' && p.text);
+            const showThinking = isLastAssistant && isBusy && !hasContent;
+
+            return (
+              <div key={`${message.id}-${index}`} className={`message ${message.role}`}>
+                <div className="message-role">
+                  {message.role === 'user' ? 'You' : 'Assistant'}
+                </div>
+                <div className="message-content">
+                  {/* Show "Thinking..." when waiting for first content */}
+                  {showThinking && <ThinkingIndicator />}
+
+                  {message.parts?.map((part, i) => (
+                    <MessagePartRenderer key={i} part={part} />
+                  ))}
+                  {/* Fallback: render content if no parts */}
+                  {!message.parts?.length && message.content && (
+                    <p>{message.content}</p>
+                  )}
+                </div>
               </div>
-              <div className="message-content">
-                {message.parts?.map((part, i) => (
-                  <MessagePartRenderer key={i} part={part} />
-                ))}
-                {/* Fallback: render content if no parts (e.g., local user messages from useChat) */}
-                {!message.parts?.length && message.content && (
-                  <p>{message.content}</p>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-        {isBusy && (
-          mode === 'workflow'
-            ? (isFirstMessage
-                ? <><WorkflowLoadingIndicator isFirstMessage={isFirstMessage} /><StreamingIndicator /></>
-                : <StreamingIndicator />)
-            : <StreamingIndicator />
+            );
+          })
         )}
       </div>
 
@@ -212,53 +210,19 @@ function EmptyState({ mode }: { mode: AgentMode }) {
   );
 }
 
-function StreamingIndicator() {
+/**
+ * Simple "Thinking..." indicator shown when waiting for assistant response
+ * Inspired by flight booking app's shimmer effect
+ */
+function ThinkingIndicator() {
   return (
-    <div className="streaming-indicator">
-      <span className="dot" />
-      <span className="dot" />
-      <span className="dot" />
-    </div>
-  );
-}
-
-const FIRST_MESSAGE_STATUSES = [
-  "Starting workflow...",
-  "Creating sandbox environment...",
-  "Initializing agent...",
-  "Preparing tools...",
-  "Processing request...",
-];
-
-const FOLLOWUP_MESSAGE_STATUSES = [
-  "Processing request...",
-  "Thinking...",
-];
-
-function WorkflowLoadingIndicator({ isFirstMessage }: { isFirstMessage: boolean }) {
-  const [messageIndex, setMessageIndex] = useState(0);
-  const messages = isFirstMessage ? FIRST_MESSAGE_STATUSES : FOLLOWUP_MESSAGE_STATUSES;
-
-  useEffect(() => {
-    setMessageIndex(0);
-  }, [isFirstMessage]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMessageIndex((prev) =>
-        prev < messages.length - 1 ? prev + 1 : prev
-      );
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }, [messages.length]);
-
-  return (
-    <div className="workflow-loading">
-      <div className="workflow-loading-content">
-        <div className="workflow-spinner" />
-        <span className="workflow-status-text">{messages[messageIndex]}</span>
-      </div>
+    <div className="thinking-indicator">
+      <span className="thinking-text">Thinking</span>
+      <span className="thinking-dots">
+        <span className="dot" />
+        <span className="dot" />
+        <span className="dot" />
+      </span>
     </div>
   );
 }
