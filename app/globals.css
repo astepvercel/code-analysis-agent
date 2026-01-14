@@ -126,6 +126,19 @@ header {
   color: var(--bg-primary);
 }
 
+.mode-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.mode-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 /* New Conversation Button */
 .new-conversation {
   padding: 14px 26px;
@@ -200,22 +213,177 @@ main {
   justify-content: center;
   height: 100%;
   color: var(--text-muted);
+  padding: 32px;
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .empty-icon {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   opacity: 0.5;
 }
 
 .empty-title {
-  font-size: 18px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 10px;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  letter-spacing: -0.02em;
 }
 
-.empty-subtitle {
+.empty-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin-bottom: 28px;
+}
+
+.features-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px;
+  width: 100%;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 13px;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.feature-icon {
+  color: var(--success);
+  flex-shrink: 0;
+}
+
+/* Mode Explanation */
+.mode-explanation {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.mode-explanation-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.mode-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mode-card {
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.mode-card.active {
+  border-color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+.mode-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.mode-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mode-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.1);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.mode-card-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.mode-card-desc code {
+  background: var(--bg-tertiary);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+}
+
+.mode-card.active .mode-card-desc code {
+  background: var(--bg-secondary);
+}
+
+@media (max-width: 500px) {
+  .mode-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.examples-section {
+  width: 100%;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+
+.examples-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.example-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.example-prompt {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: left;
+  line-height: 1.4;
+  transition: border-color 0.15s;
+}
+
+.example-prompt:hover {
+  border-color: var(--border-hover);
+}
+
+.example-quote {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 /* Message Bubbles */
@@ -315,6 +483,42 @@ main {
 
 .chat-input:focus {
   border-color: var(--border-hover);
+}
+
+.chat-input.disabled,
+.chat-input:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* Send Button */
+.send-button {
+  padding: 16px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--bg-primary);
+  transition: all 0.15s;
+}
+
+.send-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.send-button:disabled {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.send-button.busy {
+  background: rgba(234, 179, 8, 0.2);
+  color: var(--warning);
+  border: 1px solid rgba(234, 179, 8, 0.3);
 }
 
 /* Status Badge */
@@ -670,6 +874,102 @@ main {
   border: none;
   border-top: 1px solid var(--border);
   margin: 20px 0;
+}
+
+/* ==========================================================================
+   Dialog
+   ========================================================================== */
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.dialog {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 400px;
+  width: calc(100% - 32px);
+  animation: slideUp 0.15s ease-out;
+}
+
+.dialog-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.dialog-message {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.dialog-button {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.dialog-button.cancel {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.dialog-button.cancel:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+.dialog-button.confirm {
+  background: var(--accent);
+  border: none;
+  color: var(--bg-primary);
+}
+
+.dialog-button.confirm:hover {
+  opacity: 0.9;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ==========================================================================

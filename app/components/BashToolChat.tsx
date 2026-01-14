@@ -4,18 +4,29 @@ import { useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { ChatUI } from "./ChatUI";
-import { getConversationId } from "../client/session";
+import { getConversationId, getSandboxId, setSandboxId } from "../client/session";
 
 export function BashToolChat() {
-  // Memoize transport to prevent recreation on every render
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/bash-tool/chat",
         prepareSendMessagesRequest: ({ messages, ...rest }) => ({
           ...rest,
-          body: { messages, conversationId: getConversationId() },
+          body: {
+            messages,
+            conversationId: getConversationId(),
+            sandboxId: getSandboxId(),
+          },
         }),
+        fetch: async (url, options) => {
+          const response = await fetch(url, options);
+          const sandboxId = response.headers.get("x-sandbox-id");
+          if (sandboxId) {
+            setSandboxId(sandboxId);
+          }
+          return response;
+        },
       }),
     []
   );
@@ -31,6 +42,7 @@ export function BashToolChat() {
       onSend={(text) =>
         sendMessage({ text, metadata: { createdAt: Date.now() } })
       }
+      mode="bash-tool"
     />
   );
 }

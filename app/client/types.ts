@@ -1,9 +1,11 @@
-export type BashImplementation = 'bash-tool' | 'custom';
+/** Available agent implementation modes */
+export type AgentMode = 'bash-tool' | 'workflow';
 
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
   parts?: MessagePart[];
+  content?: string; // useChat may use content instead of parts for local user messages
 }
 
 export interface MessagePart {

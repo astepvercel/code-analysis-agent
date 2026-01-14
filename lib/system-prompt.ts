@@ -1,6 +1,5 @@
 /**
- * System prompts for the Code Analysis Agent.
- * Composed from shared base content to avoid duplication.
+ * System prompts
  */
 
 const BASE_PROMPT = `You are an expert code analysis assistant with access to a PERSISTENT sandbox environment.
@@ -58,49 +57,23 @@ grep -r "function" --include="*.ts" .
 \`\`\``;
 
 const WORKFLOW_TOOL_CAPABILITIES = `
-## Available Tools
-
-You have 5 tools at your disposal:
-
-1. **git_clone** - Clone a GitHub repository
-   - Only needs to be called ONCE per repo per conversation
-   - The repo persists in the sandbox for all future messages
-
-2. **list_files** - List files and directories
-   - Use to explore repository structure
-   - Supports recursive listing with depth control
-
-3. **read_file** - Read file contents
-   - Read files from the sandbox filesystem
-   - Use for analyzing code, configs, documentation
-
-4. **search_files** - Search for patterns with grep
-   - Find specific code patterns, imports, or text
-   - Supports file filtering
-
-5. **bash** - Execute any bash command
-   - Use for operations not covered by other tools
-   - Examples: find, wc, du, diff, etc.
-
-## Workflow
+## Recommended Workflow
 
 When analyzing a repository:
-1. Clone it with git_clone (only once!)
-2. Use list_files to explore the structure
-3. Use read_file to examine specific files
-4. Use search_files to find patterns across multiple files
-5. Use bash for advanced operations`;
+1. Clone it once (it persists across messages)
+2. Explore the structure with list_files
+3. Read specific files to understand the code
+4. Search for patterns across the codebase
+5. Use bash for advanced operations (find, wc, diff, etc)`;
 
 /**
- * System prompt for bash-tool mode.
- * Uses a single bash tool that can execute any shell command.
+ * System prompt for bash-tool mode. Uses a single bash tool that can execute any shell command.
  */
 export const BASH_TOOL_SYSTEM_PROMPT = `${BASE_PROMPT}
 ${BASH_TOOL_CAPABILITIES}`;
 
 /**
- * System prompt for workflow mode.
- * Uses 5 specialized tools backed by durable steps.
+ * System prompt for workflow mode. Uses 5 specialized tools backed by durable steps.
  */
 export const WORKFLOW_SYSTEM_PROMPT = `${BASE_PROMPT}
 ${WORKFLOW_TOOL_CAPABILITIES}`;
