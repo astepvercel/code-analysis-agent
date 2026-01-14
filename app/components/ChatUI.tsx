@@ -20,13 +20,12 @@ export function ChatUI({ messages, status, onSend, mode }: ChatUIProps) {
   const isSubmittingRef = useRef(false);
   const isStreaming = status === 'streaming';
 
-  // For workflow mode: allow input once assistant has responded (stream stays open)
-  // For bash-tool mode: use standard status-based logic
+  // Busy when streaming or submitted (WorkflowChat now manages status correctly)
+  const isBusy = isStreaming || status === 'submitted';
+
+  // For workflow loading indicator: check if waiting for first response
   const lastMessage = messages[messages.length - 1];
-  const hasAssistantResponse = lastMessage?.role === 'assistant';
-  const isBusy = mode === 'workflow'
-    ? messages.length > 0 && !hasAssistantResponse // Busy until assistant responds
-    : isStreaming || status === 'submitted';
+  const isFirstMessage = messages.length <= 1;
 
   // Check if user is near bottom of scroll area
   const checkIfNearBottom = useCallback(() => {
@@ -91,7 +90,10 @@ export function ChatUI({ messages, status, onSend, mode }: ChatUIProps) {
         )}
         {isBusy && (
           mode === 'workflow'
-            ? <WorkflowLoadingIndicator isFirstMessage={messages.length <= 1} />
+            ? <>
+                <WorkflowLoadingIndicator isFirstMessage={isFirstMessage} />
+                <StreamingIndicator />
+              </>
             : <StreamingIndicator />
         )}
       </div>

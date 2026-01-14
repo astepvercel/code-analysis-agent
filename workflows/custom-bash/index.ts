@@ -17,6 +17,29 @@ import { runBash } from "../steps/bash";
 import { WORKFLOW_SYSTEM_PROMPT } from "@/lib/system-prompt";
 import { MODEL_ID, log, TOOL_NAMES } from "@/lib/config";
 
+/**
+ * Step function to emit signals to the stream for a new assistant message turn.
+ * This signals to the client that a new assistant message is beginning.
+ * Must be a step because getWriter() is not supported in workflow functions.
+ */
+async function emitNewMessageSignals() {
+  "use step";
+
+  log.step("emit-start", "Emitting signals for new message turn");
+
+  const writable = getWritable<UIMessageChunk>();
+  const writer = writable.getWriter();
+
+  try {
+    // Emit start signal to indicate new message, similar to how doStreamStep does it
+    await writer.write({ type: "start" } as UIMessageChunk);
+  } finally {
+    writer.releaseLock();
+  }
+
+  return { success: true };
+}
+
 function createTools(sandboxId: string) {
   return {
     [TOOL_NAMES.gitClone]: tool({
@@ -107,8 +130,16 @@ export async function customBashWorkflow(
   const chatHook = chatMessageHook.create({ token: conversationId });
   const messages = await convertToModelMessages(initMessages);
 
+  let isFirstTurn = true;
+
   while (true) {
     log.workflow("Processing message (history length:", messages.length, ")");
+
+    // For subsequent turns, emit signals to indicate new assistant message
+    if (!isFirstTurn) {
+      await emitNewMessageSignals();
+    }
+    isFirstTurn = false;
 
     const { messages: result } = await agent.stream({
       messages: messages,
@@ -120,14 +151,16 @@ export async function customBashWorkflow(
     log.workflow("Response sent, waiting for next message...");
 
     const { message } = await chatHook;
-    log.workflow("Received:", message);
+    log.workflow("Received follow-up message:", message);
 
     if (message === "/done") {
       log.workflow("Conversation ended by user");
       break;
     }
 
+    // User message is managed by the client - just add to history for context
     messages.push({ role: "user", content: message });
+    log.workflow("User message added to history, processing...");
   }
 
   log.workflow("Conversation complete");

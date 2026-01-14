@@ -1,26 +1,30 @@
 import { chatMessageHook } from "@/workflows/hooks/chat-message";
 import { log } from "@/lib/config";
-import { getRun } from "workflow/api";
-import { createUIMessageStreamResponse } from "ai";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: conversationId } = await params;
-  const { message, workflowRunId } = await request.json();
+  const body = await request.json();
+  const { message } = body;
 
-  log.api("Resuming conversation:", conversationId, "workflow:", workflowRunId);
+  log.api("=== FOLLOW-UP MESSAGE RECEIVED ===");
+  log.api("Conversation ID:", conversationId);
+  log.api("Message:", message);
+  log.api("Full body:", JSON.stringify(body));
 
   // Resume the hook to inject the new message into the workflow
+  // The client maintains its connection to the original stream
+  log.api("Calling chatMessageHook.resume...");
   await chatMessageHook.resume(conversationId, {
     message,
     conversationId,
   });
 
-  log.api("Hook resumed, returning stream");
+  log.api("Hook resumed successfully");
 
-  // Return the workflow's readable stream so client receives new content
-  const run = getRun(workflowRunId);
-  return createUIMessageStreamResponse({ stream: run.getReadable() });
+  // Don't return a stream - just acknowledge success
+  // New content flows through the existing stream connection
+  return Response.json({ success: true });
 }
